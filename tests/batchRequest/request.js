@@ -2,7 +2,8 @@ Request = (function(){
 
     var prefixUrl = '../../cf/serviceBus/',
         testUrl = prefixUrl + 'Test.cfc',
-        transactionUrl = prefixUrl + 'Transaction.cfc';
+        transactionUrl = prefixUrl + 'Transaction.cfc',
+        indexUrl = '../../';
     
     return {
     
@@ -73,6 +74,37 @@ Request = (function(){
                     method: 'read'
                 }
                 this.doRequest(transactionUrl, params);
+            }
+            
+        },
+        
+        index: function(concurrency){
+        
+            for(var i = 1; i <= concurrency; i++){
+                params = {
+                    request: 'index ' + i ,
+                    method: 'read'
+                }
+                this.doRequest(indexUrl, params);
+            }
+            
+        },
+        
+        indexReloadApp: function(concurrency){
+        
+            for(var i = 1; i <= concurrency; i++){
+                params = {
+                    request: 'index ' + i ,
+                    method: 'read'
+                }
+                
+                var url = indexUrl;
+                
+                if(i == 5){
+                    url += '?reloadApp'
+                }
+                
+                this.doRequest.defer(50, this, [url, params]);
             }
             
         },

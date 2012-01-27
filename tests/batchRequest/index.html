@@ -27,6 +27,14 @@
     <hr>
     
     <input type="button" onClick="Request.dbRead(10)" value="Concurrent Read (isolation:serializable)">
+    <br /><br />
+
+    <hr>
+    
+    <input type="button" onClick="Request.index(10)" value="Concurrent Hit index.cfm">
+    <br /><br />
+    
+    <input type="button" onClick="Request.indexReloadApp(10)" value="Concurrent Hit index.cfm (ReloadApp on 5th request)">
 
 </body>
 </html> 
