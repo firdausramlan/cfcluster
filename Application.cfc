@@ -99,6 +99,7 @@
 		else {
 				
 		    // if user already logged in, update timeactive and check session timeout
+		    Application.svc.SessionManager.setSession({"lastactive"=Now()});
 
 		}
 		
