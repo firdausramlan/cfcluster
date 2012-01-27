@@ -6,8 +6,10 @@
 	
 	this.mappings['/root'] = GetDirectoryFromPath(GetCurrentTemplatePath());
 	this.mappings['/lib']  = this.mappings['/root'] & 'cf/lib/';
-	this.mappings['/core']  = this.mappings['/root'] & 'cf/core/';
+	this.mappings['/core'] = this.mappings['/root'] & 'cf/core/';
 	this.mappings['/svc']  = this.mappings['/root'] & 'cf/serviceBus/';
+	
+	this.customtagpaths = this.mappings['/root'] & 'cf/customTags';
 	</cfscript>
 
     <cffunction name="onApplicationStart">
@@ -51,6 +53,10 @@
 		// force lock to queue all request when somebody hit reloadApp
 		lock name="reloadApp" timeout="120" type="readOnly" {}
 		
+		if(StructKeyExists(url, 'logout') OR StructKeyExists(form, 'logout')){
+		    Application.svc.SessionManager.logout();				
+		}
+		
 		// check session status
 		var sessionStatus = Application.svc.SessionManager.sessionStatus();
 		
@@ -64,14 +70,17 @@
 				else {
 								
 					// check user credential
-				    var authorized = Application.svc.User.checkCredential(form.j_username,form.j_password);
+				    var authorization = Application.svc.User.checkCredential(form.j_username,form.j_password);
 				    
-				    if(authorized.valid){
+				    if(authorization.valid){
 				    				    
 				        // if authorized, create user session and update user info
 				        
-				        var credential = Application.svc.SessionManager.login();
-				        WriteDump(credential);abort;
+				        var credential = Application.svc.SessionManager.login(authorization);
+				        var sessionData = Application.svc.User.getUserData(credential);
+				        
+				        Application.svc.SessionManager.setSession(sessionData);
+				        
 				        				    				    
 				    }
 				    else {
@@ -90,13 +99,23 @@
 		else {
 				
 		    // if user already logged in, update timeactive and check session timeout
-				
+
 		}
 		
 		</cfscript>
 		
 		<cflog file="CFCluster" application="no" text="[onRequestStart]">
 	
-	</cffunction> 
+	</cffunction>
+	
+	<cffunction name="onApplicationEnd" returnType="void"> 
+	    <cfargument name="ApplicationScope" required=true/>
+	    
+	    <!--- close mongodb connection --->
+	    <cfscript>
+		ApplicationScope.svc.SessionManager.closeConnection();
+		</cfscript>
+	    
+	</cffunction>
 
 </cfcomponent>

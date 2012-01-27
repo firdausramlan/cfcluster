@@ -1,101 +1,120 @@
-<cfcomponent output="false">
+component {
 	
-	<cffunction name="init" output="false">
+	function init(){
+	
+	   variables.me.mongoConfig = new lib.cfmongodb.core.MongoConfig(
+            dbName = Application.reg.mongodb,
+            hosts = [
+              {
+                  serverName = Application.reg.mongohost,
+                  serverPort = Application.reg.mongoport
+              }
+            ]
+        );
+        
+        variables.me.mongo = new lib.cfmongodb.core.Mongo(variables.me.mongoConfig);
+        variables.me.sessions = variables.me.mongo.getDBCollection('sessions');
 		
-		<cfscript>
-		variables.me.mongoConfig = new lib.cfmongodb.core.MongoConfig(
-		    dbName = Application.reg.mongodb,
-		    hosts = [
-		      {
-		          serverName = Application.reg.mongohost,
-		          serverPort = Application.reg.mongoport
-		      }
-		    ]
-		);
-		
-		variables.me.mongo = new lib.cfmongodb.core.Mongo(variables.me.mongoConfig);
-		this.session = variables.me.mongo.getDBCollection('session');
-		</cfscript>
-	   
-	   <cfreturn this />
-	</cffunction>
+		return this;
 	
-	<cffunction name="login" output="true">
+	}
 	
-	   <cfscript>
-	   var credential = {};
-	   var info = {
-	   	   "ip" = CGI.REMOTE_ADDR	   	   
-	   };
-	   
-	   // insert document in mongo
-	   var auth_key = this.session.save(info);
-	   
-	   Application.svc.Util.setCookie(
-	       name     = "sms_auth_key",
-	       value    = auth_key,
-	       expires  = 2,
-	       httpOnly = true
-	   );
-	   
-	   </cfscript>
-	
-	   <cfreturn credential>
-	</cffunction>
-	
-	<cffunction name="logout" output="false">
-	
-	   <cfscript>
-	   var logout = {};
-	   
-	   // delete document in mongo
-	   
-	   Application.svc.Util.setCookie(
-	       name="sms_auth_key",
-           expires="now"
-	   );
-	   
-	   </cfscript>
-	
-	   <cfreturn logout />
-	</cffunction>
+	function login(auth){
 
-    <cffunction name="sessionStatus" output="false">
-		
-		<cfscript>
-		var status = {
-			"loggedIn" = false
+        var credential = {};
+		var info = {
+		    "ip"      = CGI.REMOTE_ADDR,
+		    "logints" = Now(),
+		    "userid"  = auth.result.userid         
 		};
 		
-		// check client cookie for auth key, if exist check document in mongo
-		if(StructkeyExists(cookie, 'sms_auth_key')){
-		  status['loggedIn'] = true;				
+		// insert document in mongo
+		var auth_key = variables.me.sessions.save(info);
+		var newSession = variables.me.sessions.findById(auth_key);
+		newSession['auth_key'] = auth_key.toString();
+		variables.me.sessions.update(newSession);
+		
+		Application.svc.Util.setCookie(
+		    name     = "sms_auth_key",
+		    value    = auth_key,
+		    expires  = 2,
+		    httpOnly = true
+		);
+		
+		credential = getSession();
+		
+		return credential;	
+	}
+	
+	function logout(){
+	
+        var logout = {};
+       
+        if(StructKeyExists(cookie, 'sms_auth_key') AND cookie.sms_auth_key NEQ ''){
+	        variables.me.sessions.removeById(cookie.sms_auth_key);
+			Application.svc.Util.setCookie(
+			    name="sms_auth_key",
+			    expires="now"
+			);
+			StructDelete(cookie, 'sms_auth_key');
+        }
+		
+		return logout;	
+	}
+	
+	function sessionStatus(){
+	
+        var status = {
+            "loggedIn" = false
+        };
+        
+        // - check client cookie for auth key
+        // - if exist check document in mongo 
+        // - optionally check timeout
+        if(StructkeyExists(cookie, 'sms_auth_key')){
+		  var s = getSession();
+          status['loggedIn'] = StructKeyExists(s, 'auth_key');                
+        }
+		
+        return status;
+	}
+	
+    function setSession(struct partialDoc){
+        
+        variables.me.sessions.update(
+            doc = {"$set" = partialDoc},
+            query = {"auth_key" = cookie.sms_auth_key}
+        );
+        
+    }
+	
+	function getSession(){
+	    var s = {};
+        var sArr = variables.me.sessions.query().$eq('auth_key', cookie.sms_auth_key).find(limit=1,keys="_id=0").asArray();
+        
+		if(ArrayLen(sArr)){
+		    s = sArr[1];
 		}
-		</cfscript>
+		
+		return s;
+    }
 	
-	   <cfreturn status />
-	</cffunction>
+	function getAllSession(){
+	    var s = variables.me.sessions.find(keys="_id=0");
+        return s.asArray();
+	}
 	
-	<cffunction name="getSession" output="false">
+	function getCount(){
+		return variables.me.sessions.count();		
+	}
 	
-	</cffunction>
+	function checkDuplicateSession(){}
 	
-	<cffunction name="setSession" output="false">
+	function purgeAllSession(){}
 	
-	</cffunction>
-	
-	<cffunction name="getAllSession" output="false">
-	
-	</cffunction>
-	
-	<cffunction name="purgeAllSession" output="false">
-	
-	</cffunction>
-	
-	<cffunction name="dumpPrivate" output="false">
-	
-	   <cfreturn variables.me />
-	
-	</cffunction>
+	// invoke this when application end
+	function closeConnection(){
+		variables.me.mongo.close();		
+	}
 
-</cfcomponent>
+}

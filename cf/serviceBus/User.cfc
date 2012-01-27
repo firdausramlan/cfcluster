@@ -22,5 +22,34 @@
 	
 	   <cfreturn credential />
 	</cffunction>
+	
+	<cffunction name="getUserData">
+		<cfargument name="credential" type="Struct" required="true">
+		
+		<cfset var s = {}>
+		
+		<cfquery name="getData" datasource="SMS">
+		SELECT
+		  p.name as nama,
+		  p.designation as designation,
+		  p.phone as phone
+		FROM
+		  `profiles` f
+		  INNER JOIN personnel p ON (f.personnel_id = p.uid)
+		WHERE
+		  f.uid = '#credential.userid#'
+		LIMIT 1
+		</cfquery>
+		
+		<cfif getData.recordcount>
+		
+		    <cfloop list="#getData.columnList#" index="sessionkey">
+			    <cfset s[lcase(sessionkey)] = getData[sessionkey][1] />
+			</cfloop>
+		
+		</cfif>
+	
+	   <cfreturn s />
+	</cffunction>
 
 </cfcomponent>
